@@ -12,8 +12,14 @@ router.get('/',async (req,res)=>{
 router.post('/',async (req,res)=>{
     if(commonUtils.validateAgainstSchema(Book,req.body,res))
         return
-    const newBook = await new Book(req.body).save()  
-    return  res.send(newBook)
+    
+    await new Book(req.body).save().then(result=>res.send(result))
+    .catch(error=>{
+        if(error.code == 11000 && error.keyValue && error.keyValue.ISBN)
+            res.send({duplicateError:true,message:"Book already exist"})
+        else
+            throw error
+    })
 })
 router.put('/:isbn',async (req,res)=>{
     const isbn = req.params.isbn
@@ -21,8 +27,13 @@ router.put('/:isbn',async (req,res)=>{
     if(!foundBook)
         return res.status(404).send({message:"book not found"})
     commonUtils.validateAgainstSchema(Book,req.body,res,true)    
-    const updatedBook = await foundBook.set(req.body).save()
-    res.send(updatedBook)
+    foundBook.set(req.body).save().then(result=>res.send(result))
+    .catch(error=>{
+        if(error.code == 11000 && error.keyValue && error.keyValue.ISBN)
+            res.send({duplicateError:true,message:"ISBN is should be unique"})
+        else
+            throw error
+    })
 })
 router.delete('/:isbn',async (req,res)=>{
     const isbn = req.params.isbn
