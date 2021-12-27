@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:q_book_finder/compoenents/MaterialTextField.dart';
+import 'package:q_book_finder/compoenents/RedButton.dart';
 
 class BookPage extends StatefulWidget {
   BookPage({Key? key}) : super(key: key);
@@ -26,14 +27,13 @@ class BookPageState extends State<BookPage> {
                   )),
               MaterialTextField("ISBN"),
               MaterialTextField("Author"),
-              MaterialTextField("Name"),
-              
+              Expanded(child: MaterialTextField("Name")),
               ButtonBar(
                 alignment: MainAxisAlignment.center,
                 children: [
                   ElevatedButton(onPressed: ()=>{},child: const Text("Create",textAlign: TextAlign.center,)),
                   ElevatedButton(onPressed: ()=>{},child: const Text("Update",textAlign: TextAlign.center,)),
-                  ElevatedButton(onPressed: ()=>{},child: const Text("Delate",textAlign: TextAlign.center,)),
+                  RedButton("Delete",()=>{})
                 ],
               ),
             ],

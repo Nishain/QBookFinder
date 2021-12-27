@@ -3,11 +3,18 @@ const commonUtils = require('../common');
 const BookStore = require('../models/BookStore');
 
 router.get('/',async (req,res)=>{
+    console.log('request recieved')
     const shopName = req.body.name;
     if(commonUtils.validate({'Shop Name':shopName}))
         return
     const shopList = await BookStore.find({$text:{$search:shopName}})
     return res.send({list:shopList})
+})
+router.get('/:id',async (req,res)=>{
+    const foundBookStore =  await BookStore.findById(req.params.id)
+    if(!foundBookStore)
+        return res.send({notFound:true,message:'store not found'})
+    return res.send(foundBookStore)    
 })
 router.post('/',async (req,res)=>{
     if(commonUtils.validateAgainstSchema(BookStore,req.body,res))
