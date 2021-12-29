@@ -42,8 +42,11 @@ router.delete('/:id',async (req,res)=>{
     const foundBook = await BookStore.findById(id)
     if(!foundBook)
         return res.status(404).send({message:"bookstore not found"})
-    const deleteCount = await BookStore.findByIdAndDelete(id)
-    res.send({deleteCount:deleteCount})
+    const result = await BookStore.findByIdAndDelete(id)
+    if(result._id)
+        res.send({deleteCount:1})
+    else    
+        res.send({deleteCount:0})
 })
 module.exports = router
 

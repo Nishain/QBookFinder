@@ -62,7 +62,7 @@ class myAppState extends State<MyApp> {
         // or simply save your changes to "hot reload" in a Flutter IDE).
         // Notice that the counter didn't reset back to zero; the application
         // is not restarted.
-        primaryColor: Colors.brown,
+        primaryColor: Colors.orange,
         primarySwatch: Colors.orange,
       ),
       home: Scaffold(

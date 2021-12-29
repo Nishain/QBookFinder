@@ -9,6 +9,7 @@ import 'package:q_book_finder/compoenents/RedButton.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:fluttertoast/fluttertoast.dart';
 
 class BookStoreScreen extends StatefulWidget with LocationUpdateCallback {
   final CameraPosition initialPosition;
@@ -18,14 +19,15 @@ class BookStoreScreen extends StatefulWidget with LocationUpdateCallback {
   State<BookStoreScreen> createState() => BookStoreState();
 }
 
-enum fieldNames { shopName, shopOwner }
+enum fieldNames { shopName, shopOwner,isbnBookOne }
 
 class BookStoreState extends State<BookStoreScreen> {
-  String? location;
   GoogleMapController? controller;
   String? shopID;
+  LatLng? currentLocation;
   late String endpoint;
   final String SHOP_ID_KEY = "shopID";
+  late SharedPreferences sharedPreferences;
   @override
   void initState() {
     super.initState();
@@ -33,6 +35,7 @@ class BookStoreState extends State<BookStoreScreen> {
           endpoint = "http://${dotenv.env['localendpoint']!}:${dotenv.env['port']!}",
           log('LOCAL ENDPOINT $endpoint'),
           SharedPreferences.getInstance().then((sharedPreference) {
+            sharedPreferences = sharedPreference;
             shopID = sharedPreference.getString(SHOP_ID_KEY);
             if (shopID != null) {
               http.get(Uri.parse('$endpoint/bookStore/$shopID'))
@@ -42,7 +45,16 @@ class BookStoreState extends State<BookStoreScreen> {
                     data['name'] as String;
                 fieldInputs[fieldNames.shopOwner]!.controller.text =
                     data['shopOwner'] as String;
+                currentLocation = LatLng(data['location'][0], data['location'][1]);    
+                if(controller!=null){
+                  onGoogleMapTapped(currentLocation!);
+                  controller!.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+                    target: currentLocation!,
+                    zoom: 17.0,
+                  )));
+                }
               });
+              
             }
           })
         });
@@ -61,7 +73,7 @@ class BookStoreState extends State<BookStoreScreen> {
                     child: const Text("Cancel",
                         style: TextStyle(color: Colors.red))),
                 ElevatedButton(
-                    onPressed: () => {},
+                    onPressed: () => {resolveAction('delete'),Navigator.of(context).pop()},
                     child: const Text("Delete",
                         style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(primary: Colors.red))
@@ -77,18 +89,83 @@ class BookStoreState extends State<BookStoreScreen> {
       Map<fieldNames, String> data = {};
       data.addAll(fieldInputs
           .map((key, value) => MapEntry(key, value.controller.text)));
-      String postBody = jsonEncode({'name':fieldInputs[fieldNames.shopName]!.controller.text,'shopOwner':fieldInputs[fieldNames.shopOwner]!.controller.text});
+      String postBody = jsonEncode({
+        'name':fieldInputs[fieldNames.shopName]!.controller.text,
+        'shopOwner':fieldInputs[fieldNames.shopOwner]!.controller.text,
+        'location':[currentLocation!.latitude,currentLocation!.longitude]
+      });
       http.Response response = await http.post(
         Uri.parse("$endpoint/BookStore/"),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body:postBody
       );    
-      SharedPreferences.getInstance().then((sharedPreference)=>sharedPreference.setString(SHOP_ID_KEY, jsonDecode(response.body)['_id']));
+      setState(() {
+        shopID = jsonDecode(response.body)['_id'];
+        if(shopID!=null){
+          sharedPreferences.setString(SHOP_ID_KEY, shopID!);  
+        }
+      });
+    }else if(action == 'commitUpdate'){
+      String updateBody = jsonEncode({
+        'name':fieldInputs[fieldNames.shopName]!.controller.text,
+        'shopOwner':fieldInputs[fieldNames.shopOwner]!.controller.text,
+        'location':[currentLocation!.latitude,currentLocation!.longitude]
+      });
+       http.Response response = await http.put(
+        Uri.parse("$endpoint/BookStore/$shopID/nothing"),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body:updateBody
+      );    
+      if(jsonDecode(response.body)['updatedCount'] > 0){
+        showToast("Have successfully updated");
+      }
+    }
+    else if(action == 'add book'){
+      String putBody = jsonEncode({'books':[fieldInputs[fieldNames.isbnBookOne]!.controller.text]});
+      http.Response response = await http.put(
+        Uri.parse("$endpoint/BookStore/$shopID/add"),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: putBody
+      );
+      showToast("Updated count ${jsonDecode(response.body)['updatedCount']}");
+    }else if(action == 'delete'){
+      http.Response response =  await http.delete(
+        Uri.parse("$endpoint/BookStore/$shopID"),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: "{}"
+      );
+      log(jsonDecode(response.body).toString());
+      if(jsonDecode(response.body)['deleteCount'] == 1){
+        showToast("successfully deleted");
+        setState(() {
+          sharedPreferences.remove(SHOP_ID_KEY);
+          shopID = null;
+          for (var field in fieldInputs.values) {
+            field.controller.clear();
+           }
+        });
+        currentLocation = null;
+        updateMapToCurrentLocation();
+      }
     }
   }
-
+  showToast(String message){
+    Fluttertoast.showToast(
+        msg: message,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Theme.of(context).primaryColor,
+        textColor: Colors.black,
+        fontSize: 16.0
+    );
+  }
   String? name, ownerName, isbn;
   updateMapToCurrentLocation({Function? notifier}) async {
+    if(currentLocation!=null){
+      onGoogleMapTapped(currentLocation!);
+      return;
+    }
     if (notifier != null) {}
     dynamic result = (await widget.getLocation(notifier));
     if (result == 'locked') {
@@ -100,10 +177,7 @@ class BookStoreState extends State<BookStoreScreen> {
         target: position,
         zoom: 17.0,
       )));
-      setState(() {
-        markers
-            .add(Marker(markerId: const MarkerId('Shop'), position: position));
-      });
+      onGoogleMapTapped(position);
     }
   }
 
@@ -112,7 +186,17 @@ class BookStoreState extends State<BookStoreScreen> {
   Map<fieldNames, MaterialTextField> fieldInputs = {
     fieldNames.shopName: MaterialTextField("Name of the shop"),
     fieldNames.shopOwner: MaterialTextField("Shop Owner"),
+    fieldNames.isbnBookOne : MaterialTextField("ISBN")
   };
+  onGoogleMapTapped(LatLng tappedPosition){
+    currentLocation = tappedPosition;
+    setState(() {
+      if(markers.isNotEmpty){
+      markers.remove(markers.first);
+      }
+      markers.add(Marker(markerId: const MarkerId('Shop'), position: tappedPosition));
+    });
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,13 +214,13 @@ class BookStoreState extends State<BookStoreScreen> {
               fieldInputs[fieldNames.shopOwner] as Widget,
               if (updateMode)
                 Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Expanded(child: MaterialTextField("ISBN"), flex: 2),
+                  Expanded(child:fieldInputs[fieldNames.isbnBookOne] as Widget, flex: 2),
                   Expanded(
                       child: Padding(
                           padding: const EdgeInsetsDirectional.only(
                               start: 7, end: 7),
                           child: ElevatedButton(
-                              onPressed: () => {},
+                              onPressed: () => {resolveAction('add book')},
                               child: const Text(
                                 "Add Book",
                                 textAlign: TextAlign.center,
@@ -151,13 +235,15 @@ class BookStoreState extends State<BookStoreScreen> {
                         "Create",
                         textAlign: TextAlign.center,
                       )),
-                  ElevatedButton(
-                      onPressed: () => {resolveAction('update')},
-                      child: const Text(
-                        "Update",
-                        textAlign: TextAlign.center,
-                      )),
-                  RedButton("Delete Shop", showDeleteConfirmationMessage)
+                  if(shopID != null)    
+                    ElevatedButton(
+                        onPressed: () => {resolveAction(updateMode ? 'commitUpdate' : 'update')},
+                        child: Text(
+                          updateMode ? "Save" : "Update",
+                          textAlign: TextAlign.center,
+                        )),
+                    if(shopID != null)    
+                      RedButton("Delete Shop", showDeleteConfirmationMessage)
                 ],
               ),
               Expanded(
@@ -166,20 +252,21 @@ class BookStoreState extends State<BookStoreScreen> {
                     mapType: MapType.normal,
                     initialCameraPosition: widget.initialPosition,
                     markers: markers,
+                    onTap: onGoogleMapTapped,
                     onMapCreated: (GoogleMapController controller) async {
                       this.controller = controller;
                       updateMapToCurrentLocation(
                           notifier: updateMapToCurrentLocation);
                     },
                   ),
-                  Align(
+                   Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
                           padding: const EdgeInsets.only(bottom: 20),
-                          child: ElevatedButton(
-                              onPressed: () => {},
-                              child: const Text("Choose Here",
-                                  textAlign: TextAlign.center))))
+                          child: Chip(backgroundColor: Theme.of(context).primaryColor,
+
+                          elevation: 2,
+                          label: const Text("click on the map to relocate",style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold),))))
                 ]),
               )
             ],
