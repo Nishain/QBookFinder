@@ -13,7 +13,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 
 class BookStoreScreen extends StatefulWidget with LocationUpdateCallback {
   final CameraPosition initialPosition;
-  BookStoreScreen(this.initialPosition, {Key? key}) : super(key: key);
+  Function(int) pageChanger;
+  BookStoreScreen(this.initialPosition,this.pageChanger, {Key? key}) : super(key: key);
 
   @override
   State<BookStoreScreen> createState() => BookStoreState();
@@ -127,7 +128,16 @@ class BookStoreState extends State<BookStoreScreen> {
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: putBody
       );
-      showToast("Updated count ${jsonDecode(response.body)['updatedCount']}");
+      dynamic resultData = jsonDecode(response.body);
+      if(resultData['unknownBook'] == true){
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Book you entered does not exist.Want to add one?"),action: SnackBarAction(label: "Add Book", onPressed: ()=>{
+          widget.pageChanger(2)
+        })));
+        
+      }else{
+        showToast("Updated count ${jsonDecode(response.body)['updatedCount']}");
+      }
+      
     }else if(action == 'delete'){
       http.Response response =  await http.delete(
         Uri.parse("$endpoint/BookStore/$shopID"),
@@ -259,11 +269,11 @@ class BookStoreState extends State<BookStoreScreen> {
                           notifier: updateMapToCurrentLocation);
                     },
                   ),
-                   Align(
+                   const Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
                           padding: const EdgeInsets.only(bottom: 20),
-                          child: Chip(backgroundColor: Theme.of(context).primaryColor,
+                          child: Chip(backgroundColor: Colors.red,
 
                           elevation: 2,
                           label: const Text("click on the map to relocate",style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold),))))

@@ -1,5 +1,6 @@
 const router = require('express').Router()
 const commonUtils = require('../common');
+const Book = require('../models/Book');
 const BookStore = require('../models/BookStore');
 
 router.get('/',async (req,res)=>{
@@ -31,11 +32,17 @@ router.put('/:id/:action',async (req,res)=>{
     if(commonUtils.validateAgainstSchema(BookStore,req.body,res,true))    
         return
     const updatingBody = commonUtils.copyFromBody(req.body,{'books':{restrict:true}})
-    if(action == 'add' || action=='remove')
-        updatingBody[action == 'add'? '$push' : '$pull'] = { 'books' : req.body['books'].length > 0 ? req.body['books'][0] : [] }
+    var isUnIdentifiedBook = false
+    if(action == 'add' || action=='remove'){
+        if(action == 'add' &&  req.body['books'].length > 0){
+            if(!(await Book.findOne({ISBN: req.body['books'][0]})))
+                isUnIdentifiedBook = true
+        }
+        if(!isUnIdentifiedBook)
+            updatingBody[action == 'add'? '$push' : '$pull'] = { 'books' : req.body['books'].length > 0 ? req.body['books'][0] : [] }
+    }
     const result = await BookStore.updateOne({_id:id},updatingBody)
-    
-    res.send({updatedCount:result.modifiedCount})
+    res.send({updatedCount:result.modifiedCount,unknownBook:isUnIdentifiedBook})
 })
 router.delete('/:id',async (req,res)=>{
     const id = req.params.id

@@ -32,14 +32,20 @@ class myAppState extends State<MyApp> {
     target: LatLng(37.42796133580664, -122.085749655962),
     zoom: 14.4746,
   );
-  var pages =  <Widget>[
-    MapSample(_kGooglePlex),
-    BookStoreScreen(_kGooglePlex),
-    BookPage()
-  ];
+  pageChanger(int page){
+    setState(() {
+      pageIndex = page;
+    });
+  }
+  late List<Widget> pages;
   LatLng? currentLocation;
   @override
   void initState() {
+    pages =  <Widget>[
+    MapSample(_kGooglePlex),
+    BookStoreScreen(_kGooglePlex,pageChanger),
+    BookPage()
+  ];
   const indexes = <int>[0,1];
       for(var index in indexes){
         LocationUpdateCallback instance = (pages[index] as LocationUpdateCallback);

@@ -25,7 +25,7 @@ router.put('/:isbn',async (req,res)=>{
     const isbn = req.params.isbn
     const foundBook = await Book.findOne({ISBN:isbn})
     if(!foundBook)
-        return res.status(404).send({message:"book not found"})
+        return res.send({notFound:true,message:"book not found"})
     commonUtils.validateAgainstSchema(Book,req.body,res,true)    
     foundBook.set(req.body).save().then(result=>res.send(result))
     .catch(error=>{
@@ -39,7 +39,7 @@ router.delete('/:isbn',async (req,res)=>{
     const isbn = req.params.isbn
     const foundBook = await Book.findOne({ISBN:isbn})
     if(!foundBook)
-        return res.status(404).send({message:"book not found"})
+        return res.send({notFound:true,message:"book not found"})
     const deleteResult = await Book.deleteOne({ISBN:isbn})    
     res.send({deleteCount:deleteResult.deletedCount})
 })
