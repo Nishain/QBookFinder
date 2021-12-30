@@ -15,20 +15,23 @@ module.exports = {
     validateAgainstSchema : (model,values,res,ignoreEmpty=false)=>{
         const paths = model.schema.paths
         const messages = []
+        var fields = [];
         for(const path in paths){
             if(path.startsWith('_'))
                 continue
-            console.log(typeof values[path])
-            console.log(paths[path].instance.toLowerCase())
             const expectedTypeName = paths[path].instance.toLowerCase()
             if(!values[path] || values[path] == ''){
-                if(!ignoreEmpty && (!paths[path].defaultValue))
+                if(!ignoreEmpty && (!paths[path].defaultValue)){
                     messages.push('should enter value for '+path)
+                    fields.push(path)
+                }
             }
-            else if((typeof values[path] != expectedTypeName) && !(expectedTypeName == 'array' && Array.isArray(values[path])))
+            else if((typeof values[path] != expectedTypeName) && !(expectedTypeName == 'array' && Array.isArray(values[path]))){
                 messages.push('should enter valid value for '+path)
+                fields.push(path)
+            }
         }if(messages.length > 0){
-            res.send({validateError:true , message:messages.join('.')})
+            res.send({validateError:true , message:messages.join('.'),errorFields:fields})
             return true
         }else
             return false
@@ -43,8 +46,11 @@ module.exports = {
                 if(fieldProperties[field].lockSingle){
                     submitingFields[field] = values[field][0]
                 }
-            }else
+            }else{
+                if(values[field] == '')
+                    continue
                 submitingFields[field] = values[field]  
+            }
         }
         return submitingFields
     }

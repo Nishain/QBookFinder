@@ -43,19 +43,35 @@ showToast(String message){
         fontSize: 16.0
     );
   }
+
   ivokeAction(String action) async {
+    for (var field in inputFields.values) { 
+      field.changableParams['errorMessage'] = null;
+    }
     if (action == 'create') {
-      String createBody = jsonEncode({
-        "name": inputFields[FieldName.bookName]!.controller.text,
-        "author": inputFields[FieldName.author]!.controller.text,
-        "ISBN": inputFields[FieldName.isbn]!.controller.text
-      });
+      _formKey.currentState!.validate();
+      Map<String,MaterialTextField> mapping = {
+        "name": inputFields[FieldName.bookName]!,
+        "author": inputFields[FieldName.author]!,
+        "ISBN": inputFields[FieldName.isbn]!
+      };
+      String createBody = jsonEncode(mapping.map((key, value) => MapEntry(key, value.controller.text)));
       http.Response response = await http.post(Uri.parse("$baseURL/books/"),
           headers: {'Content-Type': 'application/json; charset=UTF-8'},
           body: createBody);
-      if(jsonDecode(response.body)['duplicateError'] == true){
+      dynamic resultData = jsonDecode(response.body);  
+      if(resultData['duplicateError'] == true){
           showToast("Book already exists with given ISBN");
       }    
+      if(resultData['validateError'] == true){
+        for(var field in resultData['errorFields']){
+          mapping[field]!.changableParams['errorMessage'] = 'field is empty';
+        }
+      }
+      _formKey.currentState!.validate();
+      if(resultData["_id"]!=null){
+        showToast('Book created successfully');
+      }
     } else if (action == 'update') {
       String isbn = inputFields[FieldName.isbn]!.controller.text;
       String updateBody = jsonEncode({
@@ -66,26 +82,38 @@ showToast(String message){
       http.Response response = await http.put(Uri.parse("$baseURL/books/$isbn"),
           headers: {'Content-Type': 'application/json; charset=UTF-8'},
           body: updateBody);
-       if(jsonDecode(response.body)['duplicateError'] == true){
+      Map resData = jsonDecode(response.body);
+       if(resData['duplicateError'] == true){
           showToast("ISBN conflicted with another book");   
+       }else if(resData['notFound'] == true){
+         showToast('no book found with given ISBN');
+       }else{
+         showToast("successfully updated");
        }
+
     } else if (action == 'delete') {
       String isbn = inputFields[FieldName.isbn]!.controller.text;
       http.Response result = await http.delete(Uri.parse("$baseURL/books/$isbn"),
           headers: {'Content-Type': 'application/json; charset=UTF-8'},
           body: "{}");
       if(jsonDecode(result.body)['notFound'] == true){
-        showToast("such book was not found");
-      }    
+        showToast("No book with given ISBN exist");
+      }else if((jsonDecode(result.body)['deleteCount'] ?? 0) > 0){
+        showToast('successfully deleted');
+        for(var field in inputFields.values){
+          field.controller.clear();
+        }
+      }
     }
   }
-
+  final _formKey = GlobalKey<FormState>();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
           padding: const EdgeInsets.all(15),
-          child: Column(
+          child: 
+          Form(key: _formKey,child: Column(
             children: <Widget>[
               const Padding(
                   padding: EdgeInsets.all(20),
@@ -115,7 +143,8 @@ showToast(String message){
                 ],
               ),
             ],
-          )),
+          ))
+          ),
     );
   }
 }

@@ -1,4 +1,5 @@
 const router = require('express').Router()
+const { copyFromBody } = require('../common');
 const commonUtils = require('../common');
 const Book = require('../models/Book')
 
@@ -27,7 +28,7 @@ router.put('/:isbn',async (req,res)=>{
     if(!foundBook)
         return res.send({notFound:true,message:"book not found"})
     commonUtils.validateAgainstSchema(Book,req.body,res,true)    
-    foundBook.set(req.body).save().then(result=>res.send(result))
+    foundBook.set(copyFromBody(req.body,{})).save().then(result=>res.send(result))
     .catch(error=>{
         if(error.code == 11000 && error.keyValue && error.keyValue.ISBN)
             res.send({duplicateError:true,message:"ISBN is should be unique"})
