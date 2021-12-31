@@ -86,6 +86,15 @@ class BookStoreState extends State<BookStoreScreen> {
     setState(() {
       updateMode = (action == 'update');
     });
+    Map<String,MaterialTextField> mapping = {
+      'name' : fieldInputs[fieldNames.shopName]!,
+      'shopOwner' : fieldInputs[fieldNames.shopOwner]!,
+      'books' : fieldInputs[fieldNames.isbnBookOne]!
+    };
+    for(var field in fieldInputs.values){
+      field.changableParams['errorMessage'] = null;
+    }
+    http.Response? response;
     if (action == 'create') {
       Map<fieldNames, String> data = {};
       data.addAll(fieldInputs
@@ -95,14 +104,17 @@ class BookStoreState extends State<BookStoreScreen> {
         'shopOwner':fieldInputs[fieldNames.shopOwner]!.controller.text,
         'location':[currentLocation!.latitude,currentLocation!.longitude]
       });
-      http.Response response = await http.post(
+      response = await http.post(
         Uri.parse("$endpoint/BookStore/"),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body:postBody
       );    
+      Map responseData = jsonDecode(response.body);
+      log(responseData.toString());
       setState(() {
-        shopID = jsonDecode(response.body)['_id'];
-        if(shopID!=null){
+        
+        if(responseData['_id']!=null){
+          shopID = responseData['_id'];
           sharedPreferences.setString(SHOP_ID_KEY, shopID!);  
         }
       });
@@ -112,7 +124,7 @@ class BookStoreState extends State<BookStoreScreen> {
         'shopOwner':fieldInputs[fieldNames.shopOwner]!.controller.text,
         'location':[currentLocation!.latitude,currentLocation!.longitude]
       });
-       http.Response response = await http.put(
+       response = await http.put(
         Uri.parse("$endpoint/BookStore/$shopID/nothing"),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body:updateBody
@@ -123,7 +135,7 @@ class BookStoreState extends State<BookStoreScreen> {
     }
     else if(action == 'add book'){
       String putBody = jsonEncode({'books':[fieldInputs[fieldNames.isbnBookOne]!.controller.text]});
-      http.Response response = await http.put(
+      response = await http.put(
         Uri.parse("$endpoint/BookStore/$shopID/add"),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: putBody
@@ -144,7 +156,6 @@ class BookStoreState extends State<BookStoreScreen> {
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: "{}"
       );
-      log(jsonDecode(response.body).toString());
       if(jsonDecode(response.body)['deleteCount'] == 1){
         showToast("successfully deleted");
         setState(() {
@@ -158,6 +169,16 @@ class BookStoreState extends State<BookStoreScreen> {
         updateMapToCurrentLocation();
       }
     }
+    if(response != null){
+      Map responseData = jsonDecode(response.body);
+      if(responseData['validateError'] == true){
+        for(var field in responseData['errorFields']){
+          mapping[field]!.changableParams['errorMessage'] = 'invalid value';
+        }
+        
+      }
+    }
+    _formKey.currentState!.validate();
   }
   showToast(String message){
     Fluttertoast.showToast(
@@ -207,12 +228,14 @@ class BookStoreState extends State<BookStoreScreen> {
       markers.add(Marker(markerId: const MarkerId('Shop'), position: tappedPosition));
     });
   }
+  final _formKey = GlobalKey<FormState>();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
           padding: const EdgeInsets.all(15),
-          child: Column(
+          child: Form(key: _formKey,
+            child: Column(
             children: <Widget>[
               const Padding(
                   padding: EdgeInsets.all(20),
@@ -280,7 +303,8 @@ class BookStoreState extends State<BookStoreScreen> {
                 ]),
               )
             ],
-          )),
+          ))
+          ),
     );
   }
 }
